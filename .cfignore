@@ -1,0 +1,2 @@
+# couldn't get the CF Python buildpack to stage correctly with conda, so fall back to pip
+environment.yml
