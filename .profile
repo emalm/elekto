@@ -1,11 +1,5 @@
 #!/bin/bash
 
-set -o allexport
-if [[ -f .env ]]; then
-  source .env
-fi
-set +o allexport
-
 export APP_PORT="$PORT"
 export APP_HOST="0.0.0.0"
 export APP_CONNECT="http"
@@ -36,3 +30,10 @@ if [[ -n "$github_webhook_services" ]]; then
   github_webhook_env=$(echo "$github_webhook_services" | jq '.credentials | "export META_SECRET=\(.secret)"' -r)
   eval "$github_webhook_env"
 fi
+
+# allow final override from .env file if present
+set -o allexport
+if [[ -f .env ]]; then
+  source .env
+fi
+set +o allexport
