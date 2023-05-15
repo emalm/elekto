@@ -19,6 +19,7 @@ import sqlalchemy as S
 
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import text
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy import event
 
@@ -86,12 +87,15 @@ def update_schema(engine, schema_version):
     db_version = 1
     db_schema = S.inspect(engine)
     
+    session = scoped_session(sessionmaker(bind=engine))
+
     if db_schema.has_table("election"):
         if db_schema.has_table("schema_version"):
-            db_version = engine.execute('select version from schema_version').scalar()
+            db_version = session.execute(text('select version from schema_version')).scalar()
             if db_version is None:
                 """ intialize the table, if necessary """
-                engine.execute('insert into schema_version ( version ) values ( 2 )')
+                session.execute(text(f'insert into schema_version ( version ) values ( {schema_version} )'))
+                db_version = schema_version
     else:
         """ new, empty db """
         return schema_version
@@ -117,16 +121,16 @@ def update_schema_2(engine):
     """
     session = scoped_session(sessionmaker(bind=engine))
     
-    session.execute('CREATE TABLE schema_version ( version INT PRIMARY KEY);')
-    session.execute('INSERT INTO schema_version VALUES ( 2 );')
-    session.execute('ALTER TABLE voter ADD COLUMN salt BYTEA, ADD COLUMN ballot_id BYTEA;')
-    session.execute('CREATE INDEX voter_election_id ON voter(election_id);')
-    session.execute('ALTER TABLE ballot DROP COLUMN created_at, DROP COLUMN updated_at;')
-    session.execute('ALTER TABLE ballot DROP CONSTRAINT ballot_pkey;')
-    session.execute("ALTER TABLE ballot ALTER COLUMN id TYPE CHAR(32) USING to_char(id , 'FM00000000000000000000000000000000');")
-    session.execute('ALTER TABLE ballot ALTER COLUMN id DROP DEFAULT;')
-    session.execute('ALTER TABLE ballot ADD CONSTRAINT ballot_pkey PRIMARY KEY ( id );')
-    session.execute('CREATE INDEX ballot_election_id ON ballot(election_id);')
+    session.execute(text('CREATE TABLE schema_version ( version INT PRIMARY KEY);'))
+    session.execute(text('INSERT INTO schema_version VALUES ( 2 );'))
+    session.execute(text('ALTER TABLE voter ADD COLUMN salt BYTEA, ADD COLUMN ballot_id BYTEA;'))
+    session.execute(text('CREATE INDEX voter_election_id ON voter(election_id);'))
+    session.execute(text('ALTER TABLE ballot DROP COLUMN created_at, DROP COLUMN updated_at;'))
+    session.execute(text('ALTER TABLE ballot DROP CONSTRAINT ballot_pkey;'))
+    session.execute(text("ALTER TABLE ballot ALTER COLUMN id TYPE CHAR(32) USING to_char(id , 'FM00000000000000000000000000000000');"))
+    session.execute(text('ALTER TABLE ballot ALTER COLUMN id DROP DEFAULT;'))
+    session.execute(text('ALTER TABLE ballot ADD CONSTRAINT ballot_pkey PRIMARY KEY ( id );'))
+    session.execute(text('CREATE INDEX ballot_election_id ON ballot(election_id);'))
     session.commit()
     
     return 2
@@ -175,7 +179,7 @@ class Version(BASE):
     
 @event.listens_for(Version.__table__, 'after_create')
 def create_version(target, connection, **kwargs):
-    connection.execute(f"INSERT INTO schema_version ( version ) VALUES ( {schema_version} )")
+    connection.execute(text(f"INSERT INTO schema_version ( version ) VALUES ( {schema_version} )"))
 
 class User(BASE):
     """
